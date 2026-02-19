@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type ItemType = 'Heavy_Sword' | 'Heat_Source' | 'Tool';
+export type ItemType = 'Heavy_Sword' | 'Heat_Source' | 'Tool' | 'Frost_Heart';
 
 export interface ItemConfig {
   type: ItemType;
@@ -20,9 +20,10 @@ export class Item {
 
     let geometry: THREE.BufferGeometry;
     if (config.type === 'Heavy_Sword') {
-      // 重剑：长方体，调整中心点到剑柄（底部）
       geometry = new THREE.BoxGeometry(0.4, 3, 0.2);
-      geometry.translate(0, 1.5, 0); // 将几何体中心向上移动一半高度
+      geometry.translate(0, 1.5, 0); 
+    } else if (config.type === 'Frost_Heart') {
+      geometry = new THREE.OctahedronGeometry(0.6, 0); // 八面体，像一颗心
     } else {
       geometry = new THREE.BoxGeometry(1, 1, 1);
     }
@@ -32,7 +33,7 @@ export class Item {
       metalness: 0.9,
       roughness: 0.1,
       emissive: config.color,
-      emissiveIntensity: 0.5 // 加入自发光
+      emissiveIntensity: config.type === 'Frost_Heart' ? 1.0 : 0.5 
     });
     const mesh = new THREE.Mesh(geometry, material);
     mesh.castShadow = true;

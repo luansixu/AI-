@@ -16,6 +16,9 @@ export class Game {
   private items: Item[] = [];
   private keys: Set<string> = new Set();
   private clock: THREE.Clock = new THREE.Clock();
+  private mousePos = new THREE.Vector2();
+  private raycaster = new THREE.Raycaster();
+  private groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   
   private enemyMgr!: EnemyManager;
   private aiDirector!: AIDirector;
@@ -56,27 +59,44 @@ export class Game {
 
   private initWorld() {
     this.isDead = false;
-    document.querySelector('.death-overlay')?.classList.remove('show');
+    const deathOverlay = document.querySelector('.death-overlay');
+    if (deathOverlay) deathOverlay.classList.remove('show');
     
     this.items = [];
     this.collisionBodies = [];
-    while(this.scene.children.length > 0){ 
-        this.scene.remove(this.scene.children[0]); 
-    }
+    
+    // 安全清理 scene
+    const toRemove: THREE.Object3D[] = [];
+    this.scene.traverse((obj) => {
+        if ((obj as any).isDynamic) toRemove.push(obj);
+    });
+    toRemove.forEach(obj => this.scene.remove(obj));
 
     this.createBaseEnvironment();
 
     this.player = new Player();
+    (this.player.mesh as any).isDynamic = true;
     this.scene.add(this.player.mesh);
 
     const heavySword = new Item(
       { type: 'Heavy_Sword', color: 0xffffff, weight: 80 },
       new THREE.Vector3(-40, 0, -40)
     );
+    (heavySword.mesh as any).isDynamic = true;
     this.items.push(heavySword);
     this.scene.add(heavySword.mesh);
 
     this.enemyMgr = new EnemyManager(this.scene);
+    // 实装掉落逻辑
+    this.enemyMgr.onDropItem = (type, pos) => {
+      const droppedItem = new Item({ type: type as any, color: 0x00ccff, weight: 0 }, pos);
+      (droppedItem.mesh as any).isDynamic = true;
+      this.items.push(droppedItem);
+      this.scene.add(droppedItem.mesh);
+      vfxManager.createBurst(this.scene, pos, 0x00ccff, 15);
+      feedbackManager.showBanner("掉落：冰霜之心已出现！按 E 拾取。");
+    };
+
     this.aiDirector = new AIDirector(this.player, this.enemyMgr, this.scene, this.items);
     this.autoTester = new AutoTester(this.player, this.aiDirector);
   }
@@ -112,6 +132,7 @@ export class Game {
       leaves.position.y = 4;
       tree.add(trunk, leaves);
       tree.position.set(x, 0, z);
+      (tree as any).isDynamic = true;
       this.scene.add(tree);
       this.collisionBodies.push({ pos: new THREE.Vector3(x, 0, z), radius: 0.8 });
     }
@@ -126,6 +147,7 @@ export class Game {
       );
       rock.position.set(x, 0.2, z);
       rock.rotation.set(Math.random(), Math.random(), Math.random());
+      (rock as any).isDynamic = true;
       this.scene.add(rock);
       this.collisionBodies.push({ pos: new THREE.Vector3(x, 0, z), radius: radius * 0.8 });
     }
@@ -146,10 +168,18 @@ export class Game {
     });
 
     if (nearestItem) {
-      this.player.hold(nearestItem);
-      soundManager.playPickup();
-      vfxManager.createBurst(this.scene, nearestItem.mesh.position, 0xffffff);
-      feedbackManager.triggerMeme('pickup');
+      if (nearestItem.config.type === 'Frost_Heart') {
+        this.player.applyFrostHeart();
+        feedbackManager.showMeme("“你感受到了极寒的意志……体温流失减缓。”", 4000);
+        soundManager.playPickup();
+        vfxManager.createBurst(this.scene, nearestItem.mesh.position, 0x00ccff, 20);
+      } else {
+        this.player.hold(nearestItem);
+        soundManager.playPickup();
+        vfxManager.createBurst(this.scene, nearestItem.mesh.position, 0xffffff);
+        feedbackManager.triggerMeme('pickup');
+      }
+      
       this.scene.remove(nearestItem.mesh);
       const idx = this.items.indexOf(nearestItem);
       if (idx > -1) this.items.splice(idx, 1);
@@ -159,15 +189,12 @@ export class Game {
   private tryAttack() {
     if (this.isDead || !this.player.attack()) return;
 
-    // 获取玩家当前的朝向
     const targetRotation = this.player.mesh.rotation.y;
     const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), targetRotation).normalize();
     
     soundManager.playAttack();
-    // 特效跟随玩家朝向
     vfxManager.createSlashArc(this.scene, this.player.mesh.position, targetRotation);
 
-    // 攻击判定点：角色正前方 2.0 单位处
     const attackPos = this.player.mesh.position.clone().add(forward.multiplyScalar(2.0));
     const kills = this.enemyMgr.checkHit(attackPos, 4.0, this.player.mesh.position); 
     if (kills > 0) feedbackManager.triggerMeme('kill');
@@ -247,7 +274,8 @@ export class Game {
     if (this.isDead) return;
     this.isDead = true;
     soundManager.playWarning();
-    document.querySelector('.death-overlay')?.classList.add('show');
+    const deathOverlay = document.querySelector('.death-overlay');
+    if (deathOverlay) deathOverlay.classList.add('show');
     feedbackManager.showMeme("“你在这荒野中彻底冷透了……”", 4000);
     setTimeout(() => this.initWorld(), 4000);
   }

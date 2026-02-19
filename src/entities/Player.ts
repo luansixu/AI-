@@ -25,6 +25,7 @@ export class Player {
 
   private baseSpeed = 0.2; 
   private runMultiplier = 1.8;
+  private tempLossRate = 0.5; // 基础体温流失率
   
   public isAttacking = false;
   private attackTimer = 0;
@@ -33,12 +34,23 @@ export class Player {
   constructor() {
     this.mesh = new THREE.Group();
     const geometry = new THREE.CapsuleGeometry(0.5, 1, 4, 8);
-    const material = new THREE.MeshStandardMaterial({ color: 0xff2222 }); // 提高玩家颜色饱和度
+    const material = new THREE.MeshStandardMaterial({ color: 0xff2222, name: 'player-material' }); // 提高玩家颜色饱和度并命名材质
     const capsule = new THREE.Mesh(geometry, material);
     capsule.position.y = 1;
     capsule.castShadow = true;
     this.mesh.add(capsule);
     this.mesh.position.set(40, 0, 40);
+  }
+
+  public applyFrostHeart() {
+    this.tempLossRate = 0.2; // 降温速度大幅减慢
+    this.mesh.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material && obj.material.name === 'player-material') {
+        obj.material.color.set(0x00ccff);
+        obj.material.emissive.set(0x0066ff);
+        obj.material.emissiveIntensity = 0.4;
+      }
+    });
   }
 
   public takeDamage(amount: number) {
@@ -72,7 +84,7 @@ export class Player {
   }
 
   public update(keys: Set<string>, dt: number, envObjects: {pos: THREE.Vector3, radius: number}[]) {
-    this.state.temp = Math.max(0, this.state.temp - 0.5 * dt);
+    this.state.temp = Math.max(0, this.state.temp - this.tempLossRate * dt);
 
     let currentSpeed = this.baseSpeed;
     if (this.state.holding?.config.type === 'Heavy_Sword') {

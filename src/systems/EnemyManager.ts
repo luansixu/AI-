@@ -6,11 +6,13 @@ interface EnemyData {
   group: THREE.Group;
   hp: number;
   knockbackVel: THREE.Vector3;
+  kind: 'normal' | 'blue_boss';
 }
 
 export class EnemyManager {
   private scene: THREE.Scene;
   public enemies: EnemyData[] = [];
+  public onDropItem: ((type: string, pos: THREE.Vector3) => void) | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -30,8 +32,29 @@ export class EnemyManager {
     this.enemies.push({
       group: group,
       hp: 100, // 增加生命值
-      knockbackVel: new THREE.Vector3()
+      knockbackVel: new THREE.Vector3(),
+      kind: 'normal'
     });
+  }
+
+  public spawnBlueBoss(position: THREE.Vector3) {
+    const group = new THREE.Group();
+    const geo = new THREE.DodecahedronGeometry(1.2, 0); 
+    const mat = new THREE.MeshBasicMaterial({ color: 0x0066ff }); // 鲜艳蓝色
+    const mesh = new THREE.Mesh(geo, mat);
+    
+    group.add(mesh);
+    group.position.copy(position);
+    group.position.y = 1.5;
+    
+    this.scene.add(group);
+    this.enemies.push({
+      group: group,
+      hp: 300, // Boss 更厚
+      knockbackVel: new THREE.Vector3(),
+      kind: 'blue_boss'
+    });
+    console.log('[EnemyManager] Blue Boss spawned!');
   }
 
   public checkHit(attackPos: THREE.Vector3, range: number, attackerPos: THREE.Vector3): number {
@@ -54,7 +77,12 @@ export class EnemyManager {
         vfxManager.createBurst(this.scene, enemy.group.position, 0xffffff, 10);
         
         if (enemy.hp <= 0) {
-          vfxManager.createBurst(this.scene, enemy.group.position, 0xff0000, 25);
+          // 如果是蓝色 Boss，掉落冰霜之心
+          if (enemy.kind === 'blue_boss' && this.onDropItem) {
+            this.onDropItem('Frost_Heart', enemy.group.position.clone());
+          }
+
+          vfxManager.createBurst(this.scene, enemy.group.position, enemy.kind === 'blue_boss' ? 0x00ccff : 0xff0000, 30);
           this.scene.remove(enemy.group);
           this.enemies.splice(i, 1);
           killCount++;

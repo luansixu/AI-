@@ -16,6 +16,7 @@ export class AIDirector {
 
   private hasPunishedGreed = false;
   private hasGrantedMercy = false;
+  private hasSpawnedBlueBoss = false;
 
   constructor(player: Player, enemyMgr: EnemyManager, scene: THREE.Scene, items: Item[]) {
     this.player = player;
@@ -29,12 +30,12 @@ export class AIDirector {
     if (time < this.lastAssessTime) this.lastAssessTime = time;
 
     if (time - this.lastAssessTime > this.assessInterval) {
-      this.assess();
+      this.assess(time);
       this.lastAssessTime = time;
     }
   }
 
-  private assess() {
+  private assess(currentTime: number) {
     const s = this.player.state;
 
     // 剧本 A: 物极必反
@@ -54,6 +55,25 @@ export class AIDirector {
       this.triggerAlertPunishment();
       this.player.state.alert = 0; 
     }
+
+    // 剧本 D: 冰霜挑战 (存活超过 60 秒)
+    if (!this.hasSpawnedBlueBoss && currentTime > 60 && s.holding?.config.type === 'Heavy_Sword') {
+      this.triggerBlueBoss();
+      this.hasSpawnedBlueBoss = true;
+    }
+  }
+
+  private triggerBlueBoss() {
+    soundManager.playWarning();
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 25;
+    const spawnPos = this.player.mesh.position.clone().add(
+      new THREE.Vector3(Math.cos(angle) * dist, 0, Math.sin(angle) * dist)
+    );
+    this.enemyMgr.spawnBlueBoss(spawnPos);
+    vfxManager.createBurst(this.scene, spawnPos, 0x0066ff, 20);
+    feedbackManager.showMeme("“冰霜守卫已经苏醒……它守护着极寒的真谛。”", 5000);
+    feedbackManager.showBanner("警告：蓝色小 Boss 出现！击败它获取生存关键。");
   }
 
   private triggerGreedPunishment() {
