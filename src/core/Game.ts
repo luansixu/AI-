@@ -29,8 +29,8 @@ export class Game {
 
   constructor() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x221100); 
-    this.scene.fog = new THREE.FogExp2(0x221100, 0.012);
+    this.scene.background = new THREE.Color(0x2b1d0e); // 深棕色背景
+    this.scene.fog = new THREE.FogExp2(0x2b1d0e, 0.01);
 
     this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
     this.camera.position.set(0, 25, 15);
@@ -39,58 +39,60 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.5; 
+    this.renderer.toneMappingExposure = 1.4; 
     document.getElementById('app')?.appendChild(this.renderer.domElement);
 
     this.initWorld();
 
-    // 键盘监听
     window.addEventListener('keydown', (e) => {
       this.keys.add(e.code);
-      if (e.code === 'KeyJ') this.tryAttack(); // J键攻击
-      if (e.code === 'KeyE') this.tryInteract(); // E键交互
+      if (e.code === 'KeyJ') this.tryAttack(); 
+      if (e.code === 'KeyE') this.tryInteract(); 
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
     window.addEventListener('resize', () => this.onResize());
 
-    feedbackManager.showBanner("生存挑战：穿越丛林寻找白色圣剑 (按 WASD 移动, J 攻击, E 拾取)");
+    feedbackManager.showBanner("生存挑战：穿越丛林寻找白色圣剑 (按 J 攻击, E 拾取)");
     this.animate();
   }
 
   private initWorld() {
     this.isDead = false;
-    const deathOverlay = document.querySelector('.death-overlay');
-    if (deathOverlay) deathOverlay.classList.remove('show');
+    document.querySelector('.death-overlay')?.classList.remove('show');
     
     this.items = [];
     this.collisionBodies = [];
     
-    // 安全清理 scene
-    const toRemove: THREE.Object3D[] = [];
-    this.scene.traverse((obj) => {
-        if ((obj as any).isDynamic) toRemove.push(obj);
+    // 精确清理 scene
+    const children = [...this.scene.children];
+    children.forEach(child => {
+        if (!(child instanceof THREE.Camera) && !(child instanceof THREE.Light)) {
+            this.scene.remove(child);
+        }
     });
-    toRemove.forEach(obj => this.scene.remove(obj));
+
+    // 重新初始化灯光（防止清理后变黑）
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    dirLight.position.set(50, 50, 50);
+    dirLight.castShadow = true;
+    this.scene.add(dirLight);
 
     this.createBaseEnvironment();
 
     this.player = new Player();
-    (this.player.mesh as any).isDynamic = true;
     this.scene.add(this.player.mesh);
 
     const heavySword = new Item(
       { type: 'Heavy_Sword', color: 0xffffff, weight: 80 },
       new THREE.Vector3(-40, 0, -40)
     );
-    (heavySword.mesh as any).isDynamic = true;
     this.items.push(heavySword);
     this.scene.add(heavySword.mesh);
 
     this.enemyMgr = new EnemyManager(this.scene);
-    // 实装掉落逻辑
     this.enemyMgr.onDropItem = (type, pos) => {
       const droppedItem = new Item({ type: type as any, color: 0x00ccff, weight: 0 }, pos);
-      (droppedItem.mesh as any).isDynamic = true;
       this.items.push(droppedItem);
       this.scene.add(droppedItem.mesh);
       vfxManager.createBurst(this.scene, pos, 0x00ccff, 15);
@@ -102,24 +104,27 @@ export class Game {
   }
 
   private createBaseEnvironment() {
+    // 地面：温暖的棕色泥土
     const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(100, 100), 
-        new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.8 })
+        new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 })
     );
     ground.rotation.x = -Math.PI / 2;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    for (let i = 0; i < 80; i++) {
+    // 自然参考系：绿色草皮斑块
+    for (let i = 0; i < 100; i++) {
         const patch = new THREE.Mesh(
-            new THREE.PlaneGeometry(3, 3),
-            new THREE.MeshBasicMaterial({ color: 0x22cc44, transparent: true, opacity: 0.15 }) 
+            new THREE.PlaneGeometry(2.5, 2.5),
+            new THREE.MeshBasicMaterial({ color: 0x44aa22, transparent: true, opacity: 0.25 }) 
         );
-        patch.position.set((Math.random()-0.5)*95, 0.01, (Math.random()-0.5)*95);
+        patch.position.set((Math.random()-0.5)*98, 0.01, (Math.random()-0.5)*98);
         patch.rotation.x = -Math.PI/2;
         this.scene.add(patch);
     }
 
+    // 鲜艳的翠绿树木 (带有碰撞)
     for (let i = 0; i < 25; i++) {
       const x = (Math.random() - 0.5) * 90;
       const z = (Math.random() - 0.5) * 90;
@@ -128,35 +133,32 @@ export class Game {
       const tree = new THREE.Group();
       const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 2.5), new THREE.MeshStandardMaterial({color: 0x4d2b1f}));
       trunk.position.y = 1.25;
-      const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.8, 4.5, 8), new THREE.MeshStandardMaterial({color: 0x00dd33})); 
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.8, 4.5, 8), new THREE.MeshStandardMaterial({
+          color: 0x00ff44, // 翠绿
+          emissive: 0x004411,
+          emissiveIntensity: 0.2
+      })); 
       leaves.position.y = 4;
       tree.add(trunk, leaves);
       tree.position.set(x, 0, z);
-      (tree as any).isDynamic = true;
       this.scene.add(tree);
       this.collisionBodies.push({ pos: new THREE.Vector3(x, 0, z), radius: 0.8 });
     }
 
+    // 乱石 (带有碰撞)
     for (let i = 0; i < 15; i++) {
       const x = (Math.random() - 0.5) * 90;
       const z = (Math.random() - 0.5) * 90;
       const radius = Math.random() * 1.5 + 0.5;
       const rock = new THREE.Mesh(
         new THREE.DodecahedronGeometry(radius, 0),
-        new THREE.MeshStandardMaterial({color: 0x888888})
+        new THREE.MeshStandardMaterial({color: 0x777777})
       );
       rock.position.set(x, 0.2, z);
       rock.rotation.set(Math.random(), Math.random(), Math.random());
-      (rock as any).isDynamic = true;
       this.scene.add(rock);
       this.collisionBodies.push({ pos: new THREE.Vector3(x, 0, z), radius: radius * 0.8 });
     }
-
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.8)); 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); 
-    dirLight.position.set(50, 50, 50);
-    dirLight.castShadow = true;
-    this.scene.add(dirLight);
   }
 
   private tryInteract() {
@@ -179,10 +181,8 @@ export class Game {
         vfxManager.createBurst(this.scene, nearestItem.mesh.position, 0xffffff);
         feedbackManager.triggerMeme('pickup');
       }
-      
       this.scene.remove(nearestItem.mesh);
-      const idx = this.items.indexOf(nearestItem);
-      if (idx > -1) this.items.splice(idx, 1);
+      this.items.splice(this.items.indexOf(nearestItem), 1);
     }
   }
 
@@ -193,6 +193,7 @@ export class Game {
     const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), targetRotation).normalize();
     
     soundManager.playAttack();
+    // 特效现在与攻击判定完美对齐
     vfxManager.createSlashArc(this.scene, this.player.mesh.position, targetRotation);
 
     const attackPos = this.player.mesh.position.clone().add(forward.multiplyScalar(2.0));
@@ -216,10 +217,12 @@ export class Game {
 
     this.items.forEach(item => {
       if (item.config.type === 'Heat_Source') {
-        if (Math.random() < 0.3) vfxManager.createFireEffect(this.scene, item.mesh.position);
+        // 粒子特效增强
+        if (Math.random() < 0.4) vfxManager.createFireEffect(this.scene, item.mesh.position);
+        
         const dist = item.mesh.position.distanceTo(this.player.mesh.position);
-        if (dist < 8) { 
-          this.player.state.temp = Math.min(100, this.player.state.temp + 12 * dt); 
+        if (dist < 10) { // 范围再次增加
+          this.player.state.temp = Math.min(100, this.player.state.temp + 15 * dt); 
         }
       }
     });
@@ -242,7 +245,6 @@ export class Game {
     
     this.camera.position.x = this.player.mesh.position.x;
     this.camera.position.z = this.player.mesh.position.z + 15;
-    this.camera.position.y = 25;
     this.camera.lookAt(this.player.mesh.position);
     
     this.updateHUD();

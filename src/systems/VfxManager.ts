@@ -33,50 +33,44 @@ export class VfxManager {
     }
   }
 
-  // 增强版火花粒子：更鲜艳，带微弱光晕
   public createFireEffect(scene: THREE.Scene, position: THREE.Vector3) {
-    const size = 0.4 + Math.random() * 0.3; 
+    const size = 0.5 + Math.random() * 0.4; 
     const geo = new THREE.BoxGeometry(size, size, size);
-    // 强制高亮橙红色
     const mat = new THREE.MeshBasicMaterial({ 
-      color: 0xff6600, 
+      color: 0xffcc00, 
       transparent: true,
-      opacity: 0.9
+      opacity: 1.0 
     });
     const p = new THREE.Mesh(geo, mat);
-    
-    // 粒子产生点稍微散开
-    p.position.copy(position).add(new THREE.Vector3((Math.random()-0.5)*1.2, 0.2, (Math.random()-0.5)*1.2));
+    p.position.copy(position).add(new THREE.Vector3((Math.random()-0.5)*1.5, 0.2, (Math.random()-0.5)*1.5));
     scene.add(p);
 
-    const velY = 0.1 + Math.random() * 0.12;
-    const driftX = (Math.random() - 0.5) * 0.05;
-
+    const velY = 0.15 + Math.random() * 0.15;
     this.objects.push({
       mesh: p,
       life: 1.5,
       maxLife: 1.5,
       update: (dt) => {
         p.position.y += velY;
-        p.position.x += driftX;
         p.rotation.y += dt * 10;
-        p.scale.setScalar(p.scale.x * 0.96);
+        p.scale.setScalar(p.scale.x * 0.95);
       }
     });
   }
 
-  // 终极修正：对齐鼠标
+  // 终极修正版本：直接通过几何体参数对齐 Z 轴
   public createSlashArc(scene: THREE.Scene, position: THREE.Vector3, rotationY: number) {
     const group = new THREE.Group();
     group.position.copy(position);
-    group.position.y = 0.1; // 略微浮空
-    group.rotation.y = rotationY; 
+    group.position.y = 1.0; 
+    group.rotation.y = rotationY; // 0度对应正Z轴
     scene.add(group);
 
-    // 斩击弧：SphereGeometry 参数详解
-    // phiStart: 0, phiLength: PI*2/3 (120度)
-    // 我们让它的几何体初始中心点对齐 Z 轴正方向
-    const arcGeo = new THREE.SphereGeometry(3.8, 16, 8, -Math.PI/3, Math.PI * 2/3, Math.PI/3, Math.PI/3);
+    // 核心修正：
+    // 在 Three.js 中，phi=0 是 X 轴。
+    // 我们要中心在 Z 轴 (phi = PI/2 = 90度)。
+    // 120度(2PI/3)的弧，起点应该是 90 - 60 = 30度 (PI/6)。
+    const arcGeo = new THREE.SphereGeometry(4.0, 16, 8, Math.PI / 6, Math.PI * 2 / 3, Math.PI / 3, Math.PI / 3);
     const arcMat = new THREE.MeshBasicMaterial({ 
       color: 0xffffff, 
       transparent: true, 
@@ -84,16 +78,16 @@ export class VfxManager {
       side: THREE.DoubleSide 
     });
     const arc = new THREE.Mesh(arcGeo, arcMat);
-    arc.position.y = 0.8;
-    // 重要：不再需要额外的 90 度补偿，因为我们通过调整 SphereGeometry 的起始角度来对齐
+    
+    // 几何体已经自带对齐，不再需要任何本地旋转补丁
     group.add(arc);
 
     this.objects.push({
       mesh: group,
-      life: 0.3,
-      maxLife: 0.3,
+      life: 0.2,
+      maxLife: 0.2,
       update: (dt) => {
-        arc.scale.addScalar(dt * 1.2);
+        arc.scale.addScalar(dt * 2.0); 
       }
     });
   }
@@ -106,7 +100,7 @@ export class VfxManager {
       
       obj.mesh.traverse((child) => {
         if (child instanceof THREE.Mesh && child.material instanceof THREE.Material) {
-          (child.material as any).opacity = (obj.life / obj.maxLife) * 0.8;
+          (child.material as any).opacity = (obj.life / obj.maxLife);
         }
       });
 
