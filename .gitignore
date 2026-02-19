@@ -1,0 +1,10 @@
+node_modules
+dist
+.vscode
+.idea
+*.log
+package-lock.json
+diagnose.cjs
+debug-console.cjs
+test-result.png
+final-test.png

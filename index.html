@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Native 沙盒：需求链原型</title>
+  </head>
+  <body>
+    <div id="hud">
+      <div class="chip"><span>贪婪</span><strong id="hud-greed">0</strong></div>
+      <div class="chip"><span>惊扰</span><strong id="hud-alert">0</strong></div>
+    </div>
+
+    <!-- 左下角状态条 -->
+    <div id="status-bars">
+      <div class="bar-container"><div id="bar-hp" class="bar hp"></div><span>生命 HP</span></div>
+      <div class="bar-container"><div id="bar-stamina" class="bar stamina"></div><span>体力 SP</span></div>
+      <div class="bar-container"><div id="bar-temp" class="bar temp"></div><span>体温 TP</span></div>
+    </div>
+
+    <div id="banner" class="vibe-banner"></div>
+    <div id="meme-toast" class="vibe-toast"></div>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
