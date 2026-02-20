@@ -93,7 +93,7 @@ export class Game {
     (this.player.mesh as any).isDynamic = true;
     this.scene.add(this.player.mesh);
 
-    const heavySword = new Item({ type: 'Heavy_Sword', color: 0xffffff, weight: 80 }, new THREE.Vector3(-40, 0, -40));
+    const heavySword = new Item({ type: 'Heavy_Sword', color: 0xffffff, weight: 80 }, new THREE.Vector3(38, 0, 38));
     this.items.push(heavySword);
     this.scene.add(heavySword.mesh);
 
@@ -408,7 +408,7 @@ export class Game {
     this.collisionBodies.push({ pos: new THREE.Vector3(40, 0, 40), radius: 2.5 });
 
     const startStela = new Stela(new THREE.Vector3(42, 0, 38));
-    startStela.setContent("“三份木材可聚星火。杀羊取皮以作衣裳（按I）。深入极寒寻找烈焰之源。”");
+    startStela.setContent("“三份木材可聚星火。拔出祭坛旁的断刃，它是开辟极地的唯一钥匙。”");
     this.scene.add(startStela.mesh);
     this.stelae.push(startStela);
     this.collisionBodies.push({ pos: startStela.pos, radius: startStela.radius });
