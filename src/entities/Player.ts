@@ -13,30 +13,32 @@ export interface PlayerState {
     berry: number;
     iceCrystal: number;
     fireOre: number;
-    campfires: number; // 增加篝火存量
+    campfires: number; 
+    meat: number;
+    fur: number;
+    leatherCoat: number; // 增加皮衣存量 (0或1)
+    moltenCore: boolean; // 是否持有熔火核心
   };
 }
 
 export class Player {
   public mesh: THREE.Group;
   public state: PlayerState = {
-    hp: 100,
-    maxHp: 100,
-    temp: 100,
-    stamina: 100,
-    hunger: 100,
+    hp: 100, maxHp: 100, temp: 100, stamina: 100, hunger: 100,
     holding: null,
-    inventory: { wood: 0, berry: 0, iceCrystal: 0, fireOre: 0, campfires: 0 }
+    inventory: { wood: 0, berry: 0, iceCrystal: 0, fireOre: 0, campfires: 0, meat: 0, fur: 0, leatherCoat: 0, moltenCore: false }
   };
 
   private baseSpeed = 0.2; 
   private runMultiplier = 1.8;
-  private tempLossRate = 0.5; 
+  private baseTempLossRate = 0.5; // 基础体温流失率
   private hungerLossRate = 0.8; 
   
+  private hasFrostHeart = false;
   public isAttacking = false;
   private attackTimer = 0;
   private attackDuration = 0.25;
+  private vignetteEl: HTMLElement | null = null;
 
   constructor() {
     this.mesh = new THREE.Group();
@@ -47,29 +49,63 @@ export class Player {
     capsule.castShadow = true;
     this.mesh.add(capsule);
     this.mesh.position.set(30, 0, 30);
+    this.vignetteEl = document.getElementById('vignette');
   }
 
   public applyFrostHeart() {
-    this.tempLossRate = 0.2; 
+    this.hasFrostHeart = true;
+    this.updateVisualState();
+  }
+
+  public applyMoltenCore() {
+    this.state.inventory.moltenCore = true;
     this.mesh.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.material && obj.material.name === 'player-material') {
-        obj.material.color.set(0x00ccff);
-        obj.material.emissive.set(0x0066ff);
-        obj.material.emissiveIntensity = 0.4;
+        obj.material.emissive.set(0xff4400);
+        obj.material.emissiveIntensity = 0.6;
+      }
+    });
+  }
+
+  // 计算当前的耐寒系数：1.0(无), 0.5(单抗), 0.0(双抗)
+  public getTempResistance(): number {
+    let factor = 1.0;
+    if (this.hasFrostHeart) factor -= 0.5;
+    if (this.state.inventory.leatherCoat > 0) factor -= 0.5;
+    return Math.max(0, factor);
+  }
+
+  public craftLeatherCoat(): boolean {
+    if (this.state.inventory.fur >= 2 && this.state.inventory.leatherCoat === 0) {
+      this.state.inventory.fur -= 2;
+      this.state.inventory.leatherCoat = 1;
+      this.updateVisualState();
+      return true;
+    }
+    return false;
+  }
+
+  private updateVisualState() {
+    // 根据耐性状态改变颜色
+    this.mesh.traverse((obj) => {
+      if (obj instanceof THREE.Mesh && obj.material && obj.material.name === 'player-material') {
+        if (this.hasFrostHeart && this.state.inventory.leatherCoat > 0) {
+            obj.material.color.set(0x00ffff); // 极寒免疫：深天蓝
+        } else if (this.hasFrostHeart || this.state.inventory.leatherCoat > 0) {
+            obj.material.color.set(0x66ccff); // 部分耐性：浅蓝
+        }
       }
     });
   }
 
   public takeDamage(amount: number) {
     this.state.hp = Math.max(0, this.state.hp - amount);
-    const overlay = document.querySelector('.hit-overlay');
-    if (overlay) {
-      overlay.classList.add('flash');
-      setTimeout(() => overlay.classList.remove('flash'), 100);
+    if (this.vignetteEl) {
+      this.vignetteEl.classList.add('hit');
+      setTimeout(() => this.vignetteEl?.classList.remove('hit'), 200);
     }
   }
 
-  // --- 合成逻辑 ---
   public craftCampfire(): boolean {
     if (this.state.inventory.wood >= 3) {
       this.state.inventory.wood -= 3;
@@ -103,6 +139,8 @@ export class Player {
     else if (key === 'berry') inv.berry += amount;
     else if (key === 'ice_crystal') inv.iceCrystal += amount;
     else if (key === 'fire_ore') inv.fireOre += amount;
+    else if (key === 'meat') inv.meat += amount;
+    else if (key === 'fur') inv.fur += amount;
   }
 
   public eat(amount: number) {
@@ -120,15 +158,20 @@ export class Player {
   }
 
   public update(keys: Set<string>, dt: number, envObjects: {pos: THREE.Vector3, radius: number}[]) {
-    this.state.temp = Math.max(0, this.state.temp - this.tempLossRate * dt);
+    const resistance = this.getTempResistance();
+    this.state.temp = Math.max(0, this.state.temp - this.baseTempLossRate * resistance * dt);
     this.state.hunger = Math.max(0, this.state.hunger - this.hungerLossRate * dt);
 
-    // 体温/饥饿惩罚：归零后开始扣血
-    if (this.state.temp <= 0) this.takeDamage(5 * dt);
-    if (this.state.hunger <= 0) this.takeDamage(2 * dt);
+    if (this.state.temp <= 0) this.takeDamage(10 * dt);
+    if (this.state.hunger <= 0) this.takeDamage(3 * dt);
+
+    if (this.vignetteEl) {
+      if (this.state.hp < 30 || this.state.temp <= 0) this.vignetteEl.classList.add('critical');
+      else this.vignetteEl.classList.remove('critical');
+    }
 
     let currentSpeed = this.baseSpeed;
-    if (this.state.holding?.config.type === 'Heavy_Sword') currentSpeed *= 0.4;
+    if (this.state.holding?.config.type === 'Heavy_Sword') currentSpeed *= 0.7;
 
     let moveX = 0; let moveZ = 0;
     if (keys.has('KeyW')) moveZ -= 1;

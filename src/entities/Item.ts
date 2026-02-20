@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-export type ItemType = 'Heavy_Sword' | 'Heat_Source' | 'Tool' | 'Frost_Heart' | 'Wood' | 'Berry' | 'Ice_Crystal' | 'Fire_Ore';
+export type ItemType = 'Heavy_Sword' | 'Heat_Source' | 'Tool' | 'Frost_Heart' | 'Wood' | 'Berry' | 'Ice_Crystal' | 'Fire_Ore' | 'Meat' | 'Fur' | 'Molten_Core';
 
 export interface ItemConfig {
   type: ItemType;
@@ -24,11 +24,17 @@ export class Item {
       geometry.translate(0, 1.5, 0); 
     } else if (config.type === 'Frost_Heart') {
       geometry = new THREE.OctahedronGeometry(0.6, 0);
+    } else if (config.type === 'Molten_Core') {
+      geometry = new THREE.TetrahedronGeometry(0.7, 0); // 正四面体，烈焰核心
     } else if (config.type === 'Wood') {
       geometry = new THREE.CylinderGeometry(0.15, 0.15, 1.2, 6);
       geometry.rotateZ(Math.PI / 2);
     } else if (config.type === 'Berry') {
       geometry = new THREE.SphereGeometry(0.3, 8, 8);
+    } else if (config.type === 'Meat') {
+      geometry = new THREE.BoxGeometry(0.5, 0.3, 0.5); // 鲜肉块
+    } else if (config.type === 'Fur') {
+      geometry = new THREE.BoxGeometry(0.8, 0.05, 0.8); // 皮毛地毯感
     } else if (config.type === 'Ice_Crystal') {
       geometry = new THREE.IcosahedronGeometry(0.5, 0); // 二十面体冰晶
     } else if (config.type === 'Fire_Ore') {

@@ -212,3 +212,27 @@ canvas {
   letter-spacing: 10px;
   text-transform: uppercase;
 }
+
+/* 屏幕红晕反馈 */
+.vignette-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: radial-gradient(circle, transparent 60%, rgba(255, 0, 0, 0) 100%);
+  transition: background 0.2s ease;
+}
+
+.vignette-overlay.hit {
+  background: radial-gradient(circle, transparent 40%, rgba(255, 0, 0, 0.4) 100%);
+}
+
+.vignette-overlay.critical {
+  background: radial-gradient(circle, transparent 20%, rgba(255, 0, 0, 0.6) 100%);
+  animation: pulse-vignette 1s infinite alternate;
+}
+
+@keyframes pulse-vignette {
+  from { opacity: 0.4; }
+  to { opacity: 0.8; }
+}
